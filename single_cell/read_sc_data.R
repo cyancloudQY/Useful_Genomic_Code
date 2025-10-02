@@ -134,3 +134,45 @@ redo_reduce_dimension <- function(seurat_object, pc,res){
   
   return(seurat_object)
 }
+
+
+
+########################### Rename to Symbol ####################################
+RenameGenesSeurat <- function(obj, newnames) { 
+  print("在整合之前运行此函数。它仅更改obj@assays$RNA@counts、@data 和 @scale.data。")
+  if("RNA" %in% names(obj@assays)) {
+    RNA <- obj@assays$RNA
+    if (nrow(RNA@counts) == length(newnames)) {
+      dimnames(RNA@counts)[[1]] <- newnames
+      if (!is.null(RNA@data) && nrow(RNA@data) == length(newnames)) {
+        dimnames(RNA@data)[[1]] <- newnames
+      }
+      if (!is.null(RNA@scale.data) && nrow(RNA@scale.data) == length(newnames)) {
+        dimnames(RNA@scale.data)[[1]] <- newnames
+      }
+      obj@assays$RNA <- RNA
+    } else {
+      stop("基因集不匹配：nrow(RNA) != length(newnames)")
+    }
+  } else {
+    stop("提供的 Seurat 对象没有 RNA 测序。")
+  }
+  return(obj)
+}
+gene <- rownames(single_cell)
+gene_table <- bitr(gene, fromType = 'ENSEMBL', toType = 'SYMBOL',
+                   OrgDb = org.Hs.eg.db)
+
+gene_df <- data.frame(gene = gene)
+gene_df <- left_join(gene_df, gene_table, by = join_by('gene' == 'ENSEMBL')
+)
+
+gene_df <- gene_df %>% 
+  distinct(gene, .keep_all = TRUE)  
+gene_df$SYMBOL <- ifelse(is.na(gene_df$SYMBOL), 'NA', gene_df$SYMBOL)
+gene_df$SYMBOL <- make.unique(gene_df$SYMBOL)
+
+single_cell <- RenameGenesSeurat(single_cell, gene_df$SYMBOL)
+##################################
+
+
